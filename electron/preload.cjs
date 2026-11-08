@@ -80,7 +80,7 @@ contextBridge.exposeInMainWorld('nexusApi', {
   /**
    * トラブルシューティングやリセットが必要な場合、全設定を工場出荷時の状態に戻します。
    */
-  resetToDefaults: (lang) => ipcRenderer.invoke('reset-to-defaults', lang),
+  resetToDefaults: () => ipcRenderer.invoke('reset-to-defaults'),
 
   /**
    * 全カテゴリのフィード先をGeminiで再取得します。

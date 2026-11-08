@@ -43,11 +43,8 @@ export function registerSettingsIpc(services: Services): void {
     return await settingsManager.getUsageStats();
   });
 
-  // 注意: SettingsManager.resetToDefaults() は引数を取らないので、言語は実際には使われない（旧版から同じ。Issue で扱う）。
-  // 契約テストで旧版と同じ呼び出しを固定しているため、渡し方は変えない
-  ipcMain.handle('reset-to-defaults', async (_event, lang?: string) => {
-    const resetToDefaults = settingsManager.resetToDefaults as (lang: string) => Promise<boolean>;
-    const success = await resetToDefaults.call(settingsManager, lang || 'ja');
+  ipcMain.handle('reset-to-defaults', async () => {
+    const success = await settingsManager.resetToDefaults();
     return { success };
   });
 }

@@ -126,7 +126,7 @@ export function useProfileActions({
     if (!(await customConfirm(t.dialog.restoreDefaultProfile, t.handlers.resetConfirm))) return;
     setIsSaving(true);
     try {
-      await nexusApi.resetToDefaults(language);
+      await nexusApi.resetToDefaults();
       await customAlert(t.dialog.success, t.handlers.resetSuccess, 'success');
       window.location.reload();
     } catch (err) {
@@ -134,7 +134,7 @@ export function useProfileActions({
     } finally {
       setIsSaving(false);
     }
-  }, [customConfirm, customAlert, language, t, handleError]);
+  }, [customConfirm, customAlert, t, handleError]);
 
   const handleReacquireAllFeeds = useCallback(async () => {
     if (!apiKey) {
