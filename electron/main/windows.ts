@@ -76,11 +76,14 @@ export function createMainWindow(services: Services, isDev: boolean, electronDir
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // 起動直後に一度フェッチして、すぐに記事を表示する
+    // 起動直後に一度フェッチして、すぐに記事を表示する。
+    // 拒否を放置すると unhandledRejection になり、crashLog が app.quit() する。
     services.settingsManager.getInterests().then((interests) => {
-      services.scraper.fetchAndProcessArticlesWithFallback(interests).then((articles) => {
-        console.log(`[Main] Initial fetch completed: ${articles.length} articles.`);
-      });
+      return services.scraper.fetchAndProcessArticlesWithFallback(interests);
+    }).then((articles) => {
+      console.log(`[Main] Initial fetch completed: ${articles.length} articles.`);
+    }).catch((error: unknown) => {
+      console.error('[Main] Initial fetch failed:', error);
     });
   });
 
