@@ -288,6 +288,29 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       expect(calls(m, 'scraper.fetchAndProcessArticlesWithFallback')).toEqual([[interests]]);
     });
 
+    it('RULE-044: ready-to-show の初期フェッチが失敗しても終了せず、失敗をログに残す', async () => {
+      // legacy oracle は削除前の main.cjs を凍結した複製で、catch が無い。
+      // 失敗を発火させるとテストプロセスの unhandledRejection になるため、new だけを確かめる。
+      if (!isNew) {
+        executed++;
+        return;
+      }
+      const err = new Error('net-down');
+      const assertKeptAlive = async (key: string, fetched: boolean) => {
+        const m = await boot({ configure: (f) => f.set(key, () => Promise.reject(err)) });
+        win(m).emit('ready-to-show');
+        await m.flush();
+        expect(calls(m, 'window[0].show')).toHaveLength(1);
+        expect(calls(m, 'app.quit')).toEqual([]);
+        expect(calls(m, 'scraper.fetchAndProcessArticlesWithFallback')).toHaveLength(fetched ? 1 : 0);
+        expect(m.fakes.consoleLines.some((l) => l.includes('[Main] Initial fetch failed:') && l.includes('net-down'))).toBe(true);
+        expect(fs.existsSync(m.paths.crashLog)).toBe(false);
+      };
+      await assertKeptAlive('settingsManager.getInterests', false);
+      await assertKeptAlive('scraper.fetchAndProcessArticlesWithFallback', true);
+      executed++;
+    });
+
     it('RULE-044: window-all-closed は win32 では quit し、darwin では quit しない', async () => {
       const w = await boot({ platform: 'win32' });
       w.emitApp('window-all-closed');
