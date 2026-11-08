@@ -47,6 +47,12 @@ export class NexusOrchestrator {
    * クライアントとの接続状態を管理し、一斉送信を可能にする。
    */
   private subscribers: Set<FastifyReply> = new Set();
+
+  /**
+   * 進捗を関数で受け取る購読者（Electron の main がレンダラーへ中継するのに使う）。
+   * SSE の応答オブジェクトを装わなくても購読できる。
+   */
+  private listeners: Set<(notification: OrchestratorNotification) => void> = new Set();
   
   /**
    * 多重実行を防止するための排他制御フラグ。
@@ -97,6 +103,19 @@ export class NexusOrchestrator {
   }
 
   /**
+   * 進捗通知をコールバックで購読する。
+   *
+   * @param {(notification: OrchestratorNotification) => void} callback - 通知のたびに呼ばれる関数
+   * @returns {() => void} 購読を解除する関数
+   */
+  public onEvent(callback: (notification: OrchestratorNotification) => void): () => void {
+    this.listeners.add(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
+
+  /**
    * 現在接続中の全購読者（クライアント）へ、システムの状態変更やタスク進捗を通知する。
    * 
    * @param {OrchestratorNotification} data - 送信する通知ペイロード
@@ -106,6 +125,15 @@ export class NexusOrchestrator {
     if (!data.timestamp) data.timestamp = new Date().toISOString();
     console.log(`[NexusOrchestrator] ${data.message || data.status}`);
     const payload = `data: ${JSON.stringify(data)}\n\n`;
+
+    // コールバック購読者へ配信。1 つの失敗で他の購読者への配信を止めない
+    for (const listener of this.listeners) {
+      try {
+        listener(data);
+      } catch (error) {
+        console.error('[NexusOrchestrator] 通知のコールバックが失敗しました:', error);
+      }
+    }
     
     // 全購読者への一斉配信ループ
     for (const res of this.subscribers) {

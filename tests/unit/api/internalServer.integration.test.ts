@@ -86,7 +86,8 @@ describe('内部 HTTP API（本物の Fastify + CORS）', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('text/event-stream');
     expect(res.headers['access-control-allow-origin']).toBe(ALLOWED);
-    expect(res.body).toBe('data: {"status":"idle"}\n\n');
+    // 最初のコメント行（接続成立の合図）のあとに、通常のイベントが続く
+    expect(res.body).toBe(': connected\n\ndata: {"status":"idle"}\n\n');
     expect((services.orchestrator as unknown as { subscribe: ReturnType<typeof vi.fn> }).subscribe).toHaveBeenCalledTimes(1);
   });
 });

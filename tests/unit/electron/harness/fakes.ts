@@ -266,6 +266,7 @@ export class Fakes {
       }),
       on: (event: string, fn: Impl) => { this.calls.push({ target: 'app', method: 'on', args: [event, fn] }); this.on(this.appHandlers, event, fn); },
       quit: this.fn('app', 'quit'),
+      exit: this.fn('app', 'exit'),
       setLoginItemSettings: this.fn('app', 'setLoginItemSettings'),
     };
 
@@ -361,10 +362,8 @@ export class Fakes {
     const ScoringService = this.makeClass('ScoringService', 'scoringService', 'scoringService', [], []);
     const ScraperFacade = this.makeClass('ScraperFacade', 'scraper', 'scraper',
       ['getDashboard', 'discoverTrends', 'fetchAndProcessArticlesWithFallback'], []);
-    // 実 NexusOrchestrator には setWebContents が無い (src に定義なし)。main 側の typeof ガードを通すため
-    // フェイクには用意し、呼び出しを記録する。
     const NexusOrchestrator = this.makeClass('NexusOrchestrator', 'orchestrator', 'orchestrator',
-      [], ['runAutonomousLoop', 'setWebContents', 'subscribe']);
+      [], ['runAutonomousLoop', 'subscribe', 'onEvent']);
     const ObsidianVaultService = this.makeClass('ObsidianVaultService', 'obsidianVaultService', 'obsidianVaultService', [], []);
 
     const LMClass = this.makeClass('LicenseManager', 'licenseManager', 'licenseManager',

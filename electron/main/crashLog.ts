@@ -28,14 +28,18 @@ function describe(value: unknown): unknown {
   return (value as { stack?: unknown } | null | undefined)?.stack || value;
 }
 
-/** 捕まえられなかった例外と Promise の拒否を記録し、アプリを終了する。 */
+/**
+ * 捕まえられなかった例外と Promise の拒否を記録し、アプリを終了する。
+ * app.quit() は before-quit で止められうるうえ、終了コードが 0 になる。
+ * 異常終了なので、イベントを経由せず終了コード 1 で即座に抜ける app.exit(1) を使う。
+ */
 export function installCrashHandlers(): void {
   process.on('uncaughtException', (error) => {
     writeCrashLog(`Uncaught Exception: ${new Date().toISOString()}\n${describe(error)}\n`);
-    app.quit();
+    app.exit(1);
   });
   process.on('unhandledRejection', (reason) => {
     writeCrashLog(`Unhandled Rejection: ${new Date().toISOString()}\nReason: ${describe(reason)}\n`);
-    app.quit();
+    app.exit(1);
   });
 }

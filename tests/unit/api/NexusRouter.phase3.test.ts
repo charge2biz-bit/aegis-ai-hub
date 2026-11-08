@@ -108,7 +108,8 @@ describe('追加した 4 ルート（承認済みの差分 5）', () => {
     const res = await server.inject({ method: 'GET', url: '/api/v5/events', headers: auth });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('text/event-stream');
-    expect(res.body).toBe('data: {"status":"idle"}\n\n');
+    // 最初のコメント行（接続成立の合図）のあとに通常のイベントが続く
+    expect(res.body).toBe(': connected\n\ndata: {"status":"idle"}\n\n');
     expect(services.orchestrator.subscribe).toHaveBeenCalledTimes(1);
   });
 });

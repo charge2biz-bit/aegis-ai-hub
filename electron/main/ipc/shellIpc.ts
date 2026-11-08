@@ -1,7 +1,7 @@
 import { app, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { LicenseManager } from '../../../src/services/LicenseManager';
-import { getMainWindow } from '../mainWindowState';
+import { getMainWindow, sendToRenderer } from '../mainWindowState';
 import { isWebUrl, openArticleWindow } from '../windows';
 
 /** カスタムタイトルバーのウィンドウ操作と、外部 URL・記事ウィンドウを開く IPC。 */
@@ -37,14 +37,14 @@ export function registerLicenseAndUpdateIpc(licenseManager: LicenseManager): voi
   ipcMain.handle('activate-license', async (_event, key: string, email: string) => {
     const result = await licenseManager.activate(key, email);
     if (result.success) {
-      getMainWindow()?.webContents.send('license-changed', licenseManager.state);
+      sendToRenderer('license-changed', licenseManager.state);
     }
     return result;
   });
 
   ipcMain.handle('deactivate-license', async () => {
     await licenseManager.deactivate();
-    getMainWindow()?.webContents.send('license-changed', licenseManager.state);
+    sendToRenderer('license-changed', licenseManager.state);
     return { success: true };
   });
 

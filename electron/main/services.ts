@@ -1,5 +1,4 @@
 import path from 'path';
-import type { FastifyReply } from 'fastify';
 import { ElectronSettingsManager } from '../ElectronSettingsManager';
 import { GeminiService } from '../../src/services/GeminiService';
 import { FeedManager } from '../../src/services/FeedManager';
@@ -35,30 +34,11 @@ interface ScraperSharedServices {
 }
 
 /**
- * NexusOrchestrator の進捗通知（SSE 用の購読口）を、レンダラーへの IPC `agent-event` に中継する。
+ * NexusOrchestrator の進捗通知を、レンダラーへの IPC `agent-event` に中継する。
  * Phase 3 で承認された差分: 旧版では main がこのイベントを一度も送っていなかった。
  */
 function bridgeAgentEventsToRenderer(orchestrator: NexusOrchestrator): void {
-  if (typeof orchestrator.subscribe !== 'function') return;
-  interface EventSink {
-    write(payload: string): boolean;
-    on(): EventSink;
-  }
-  const raw: EventSink = {
-    write(payload: string): boolean {
-      const json = payload.replace(/^data: /, '').trim();
-      try {
-        sendToRenderer('agent-event', JSON.parse(json));
-      } catch (error) {
-        console.error('[Main] agent-event の中継に失敗しました:', error);
-      }
-      return true;
-    },
-    on(): EventSink {
-      return raw;
-    },
-  };
-  orchestrator.subscribe({ raw } as unknown as FastifyReply);
+  orchestrator.onEvent((notification) => sendToRenderer('agent-event', notification));
 }
 
 /**
