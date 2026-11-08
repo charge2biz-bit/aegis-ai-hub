@@ -177,14 +177,12 @@ export const nexusApi = {
   },
 
   /** プロファイルをデフォルト状態にリセットする。 */
-  async resetToDefaults(language: string = 'ja'): Promise<{ success: boolean }> {
+  async resetToDefaults(): Promise<{ success: boolean }> {
     if (window.nexusApi?.resetToDefaults && !isE2E()) {
-      return await window.nexusApi.resetToDefaults(language);
+      return await window.nexusApi.resetToDefaults();
     }
     const res = await apiFetch(`${this.getBackendUrl()}/api/v5/reset-to-defaults`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ language })
+      method: 'POST'
     });
     return await res.json();
   },

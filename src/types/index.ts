@@ -88,7 +88,7 @@ export interface NexusApiBridge {
   restructureCategories: (count?: number, language?: string) => Promise<{ categories: Record<string, InterestCategory>; feedConfig: FeedConfig }>;
   discoverTrends: () => Promise<{ suggestions: TrendSuggestion[] }>;
   translateInterests: (settings: NexusSettings) => Promise<{ interests: Interests, feedConfig: FeedConfig }>;
-  resetToDefaults: (language?: string) => Promise<{ success: boolean }>;
+  resetToDefaults: () => Promise<{ success: boolean }>;
   windowControl: (action: 'minimize' | 'maximize' | 'close' | 'quit') => void;
   getUiSettings: () => Promise<UiSettings>;
   saveUiSettings: (settings: UiSettings) => Promise<{ success: boolean }>;

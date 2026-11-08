@@ -32,6 +32,8 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
    * 次の変更は Phase 3 の承認ではなく、Phase 3 のレビュー指摘への対応（P-267）で入れた差分:
    * 定義の無い setWebContents を呼ばない／致命エラーは app.quit でなく app.exit(1)／
    * パッケージ版は内部 HTTP API を待ち受けない／開発中の Fastify ログはクエリのトークンを伏せる
+   *
+   * P-266（2026-11-09 ユーザー決定）: reset-to-defaults の言語の指定をやめる。new は resetToDefaults を引数なしで呼ぶ（legacy は旧版のまま）
    */
   const isNew = name === 'new';
   const HANDLED_COUNT = isNew ? 23 : 24;
@@ -785,13 +787,14 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       expect(m.rendererSends).toEqual([]);
     });
 
-    it('reset-to-defaults は言語を渡し {success} に包む (未指定は "ja")', async () => {
+    it('reset-to-defaults は {success} に包む。新版は言語を受け取らず引数なしで呼ぶ (P-266)', async () => {
       const m = await boot();
       const r = await observe('reset-to-defaults', m, () => m.invoke('reset-to-defaults', 'en'));
       expect(r.value).toEqual({ success: true });
       const r2 = await observe('reset-to-defaults-default-lang', m, () => m.invoke('reset-to-defaults'));
       expect(r2.value).toEqual({ success: true });
-      expect(calls(m, 'settingsManager.resetToDefaults')).toEqual([['en'], ['ja']]);
+      // legacy は旧版の挙動（言語を渡す）をそのまま固定する。new は P-266 で引数を外したので渡さない
+      expect(calls(m, 'settingsManager.resetToDefaults')).toEqual(isNew ? [[], []] : [['en'], ['ja']]);
     });
 
     it('reset-to-defaults は失敗の真偽値をそのまま {success:false} にして返す', async () => {

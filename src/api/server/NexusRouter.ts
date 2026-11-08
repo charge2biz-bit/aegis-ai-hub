@@ -183,12 +183,11 @@ export const nexusRouter = async (fastify: FastifyInstance, options: FastifyPlug
   /**
    * POST /reset-to-defaults
    * 設定を初期状態に戻す（IPC の reset-to-defaults と同じ処理）。
-   * 注意: SettingsManager.resetToDefaults() は引数を取らないので、言語は実際には使われない（IPC と同じ）。
+   * 引数は取らない。互換のため、余分な本文・クエリの language は無視する（エラーにしない）。
    */
-  fastify.post('/reset-to-defaults', async (request, reply) => {
+  fastify.post('/reset-to-defaults', async (_request, reply) => {
     try {
-      const { language } = (request.body ?? {}) as { language?: string };
-      const success = await settingsManager.resetToDefaults(language || 'ja');
+      const success = await settingsManager.resetToDefaults();
       return { success };
     } catch (error) {
       console.error('[NexusRouter] Reset To Defaults Error:', error);

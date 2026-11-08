@@ -86,12 +86,14 @@ describe('追加した 4 ルート（承認済みの差分 5）', () => {
     expect(services.evolution.translateInterests).toHaveBeenCalledWith(body);
   });
 
-  it('POST /reset-to-defaults は言語を渡す（未指定なら ja）', async () => {
+  it('POST /reset-to-defaults は言語を受け取らず引数なしで呼ぶ（余分な language は無視し、エラーにしない / P-266）', async () => {
     const { server, services } = await start();
     const en = await server.inject({ method: 'POST', url: '/api/v5/reset-to-defaults', headers: auth, payload: { language: 'en' } });
+    expect(en.statusCode).toBe(200);
     expect(en.json()).toEqual({ success: true });
-    await server.inject({ method: 'POST', url: '/api/v5/reset-to-defaults', headers: auth, payload: {} });
-    expect(services.settingsManager.resetToDefaults.mock.calls).toEqual([['en'], ['ja']]);
+    const bare = await server.inject({ method: 'POST', url: '/api/v5/reset-to-defaults', headers: auth });
+    expect(bare.statusCode).toBe(200);
+    expect(services.settingsManager.resetToDefaults.mock.calls).toEqual([[], []]);
   });
 
   it('処理が失敗したら 500 を返し、例外の詳細は応答に含めない', async () => {
