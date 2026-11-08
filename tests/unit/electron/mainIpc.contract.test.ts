@@ -28,6 +28,10 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
    * 1. license-changed を preload が受け取れる  2. agent-event を main が送る
    * 3. 内部 HTTP API はトークンの無いリクエストを 401 で断る  4. get-proposals（中身の無いスタブ）を削除
    * 5. nexusApi が呼ぶ HTTP ルート 4 本を NexusRouter に追加（tests/unit/api/NexusRouter.phase3.test.ts で確認）
+   *
+   * 次の変更は Phase 3 の承認ではなく、Phase 3 のレビュー指摘への対応（P-267）で入れた差分:
+   * 定義の無い setWebContents を呼ばない／致命エラーは app.quit でなく app.exit(1)／
+   * パッケージ版は内部 HTTP API を待ち受けない／開発中の Fastify ログはクエリのトークンを伏せる
    */
   const isNew = name === 'new';
   const HANDLED_COUNT = isNew ? 23 : 24;
@@ -112,15 +116,18 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
 
     it('承認済みの差分 2: new では エージェントの進捗を agent-event としてレンダラーへ送る（legacy は送らない）', async () => {
       const m = await boot();
-      const subscribed = calls(m, 'orchestrator.subscribe');
+      const subscribed = calls(m, 'orchestrator.onEvent');
       if (!isNew) {
         expect(subscribed).toEqual([]);
+        expect(calls(m, 'orchestrator.subscribe')).toEqual([]);
         executed++;
         return;
       }
+      // SSE の応答を装わず、onEvent のコールバックで受ける（偽の FastifyReply は渡さない）
+      expect(calls(m, 'orchestrator.subscribe')).toEqual([]);
       expect(subscribed).toHaveLength(1);
-      const sink = subscribed[0][0] as { raw: { write: (payload: string) => unknown } };
-      sink.raw.write(`data: ${JSON.stringify({ status: 'working', agentId: 'architect', message: 'm' })}\n\n`);
+      const callback = subscribed[0][0] as (n: unknown) => void;
+      callback({ status: 'working', agentId: 'architect', message: 'm' });
       expect(m.rendererSends.filter((x) => x.channel === 'agent-event').map((x) => x.args)).toEqual([
         [{ status: 'working', agentId: 'architect', message: 'm' }],
       ]);
@@ -196,9 +203,9 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       executed++;
     });
 
-    it('orchestrator.setWebContents にメインウィンドウの webContents を渡す (実クラスには未定義のため本番では no-op)', async () => {
+    it('P-267 の変更: new では 定義の無い orchestrator.setWebContents を呼ばない（フェイクに用意しても呼ばれない）', async () => {
       const m = await boot();
-      expect(calls(m, 'orchestrator.setWebContents')).toEqual([[win(m).webContents]]);
+      expect(calls(m, 'orchestrator.setWebContents')).toEqual([]);
       executed++;
     });
 
@@ -334,13 +341,24 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       executed++;
     });
 
-    it('RULE-044: uncaughtException は <userData>/crash.log に追記して app.quit する', async () => {
+    /** P-267 の変更: new は before-quit で止められず終了コードも 1 になる app.exit(1)。legacy は app.quit。 */
+    function expectFatalExit(m: MainUnderTest): void {
+      if (isNew) {
+        expect(calls(m, 'app.exit')).toEqual([[1]]);
+        expect(calls(m, 'app.quit')).toEqual([]);
+      } else {
+        expect(calls(m, 'app.quit')).toHaveLength(1);
+        expect(calls(m, 'app.exit')).toEqual([]);
+      }
+    }
+
+    it('RULE-044: uncaughtException は <userData>/crash.log に追記して終了する（new は app.exit(1)）', async () => {
       const m = await boot();
       m.emitProcess('uncaughtException', new Error('boom-uncaught'));
       const text = fs.readFileSync(m.paths.crashLog, 'utf8');
       expect(text).toContain('Uncaught Exception: ');
       expect(text).toContain('boom-uncaught');
-      expect(calls(m, 'app.quit')).toHaveLength(1);
+      expectFatalExit(m);
       m.emitProcess('uncaughtException', new Error('second'));
       expect(fs.readFileSync(m.paths.crashLog, 'utf8')).toContain('boom-uncaught'); // 追記であり上書きではない
       executed++;
@@ -352,14 +370,14 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       const text = fs.readFileSync(m.paths.crashLog, 'utf8');
       expect(text).toContain('Unhandled Rejection: ');
       expect(text).toContain('Reason: plain-reason');
-      expect(calls(m, 'app.quit')).toHaveLength(1);
+      expectFatalExit(m);
       executed++;
     });
 
     it('RULE-044: ready 前の致命エラーは userData が使えず、ログ書き込みに失敗しても app.quit まで進む', async () => {
       const m = await boot({ autoStart: false });
       m.emitProcess('uncaughtException', new Error('early'));
-      expect(calls(m, 'app.quit')).toHaveLength(1);
+      expectFatalExit(m);
       expect(fs.existsSync(m.paths.crashLog)).toBe(false);
       executed++;
     });
@@ -371,7 +389,15 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       const m = await boot();
       recordStartup('startup-server', m);
       executed++;
-      expect(m.fakes.fastifyCalls).toEqual([{ logger: true }]);
+      // P-267 の変更: new の開発中ログは、リクエストのクエリのトークンを伏せるシリアライザーつき
+      if (isNew) {
+        expect(m.fakes.fastifyCalls).toHaveLength(1);
+        const logger = (m.fakes.fastifyCalls[0] as { logger: { serializers: { req: (r: unknown) => { url: string } } } }).logger;
+        expect(logger.serializers.req({ method: 'GET', url: '/api/v5/events?token=SECRET', host: 'h', ip: '127.0.0.1', socket: {} }).url)
+          .toBe('/api/v5/events?token=[REDACTED]');
+      } else {
+        expect(m.fakes.fastifyCalls).toEqual([{ logger: true }]);
+      }
       expect(calls(m, 'server.listen')).toEqual([[{ port: 3005, host: '127.0.0.1' }]]);
       const router = m.fakes.serverRegistrations.find((r) => r.plugin === m.fakes.nexusRouter)!;
       expect(router.opts.prefix).toBe('/api/v5');
@@ -382,9 +408,19 @@ describe.each(LOADERS)('main process contract (%s)', (name, load) => {
       expect(m.fakes.serverRegistrations.map((r) => r.plugin)).toEqual([m.fakes.cors, m.fakes.nexusRouter]);
     });
 
-    it('packaged では fastify の logger を無効にする', async () => {
+    it('packaged: legacy は logger 無効で待ち受けるが、new は待ち受けない（Fastify も作らない）', async () => {
       const m = await boot({ packaged: true });
-      expect(m.fakes.fastifyCalls).toEqual([{ logger: false }]);
+      if (isNew) {
+        // P-267 の変更: レンダラーは IPC だけを使い、トークンも誰にも渡らない。ポートを開けない
+        expect(m.fakes.fastifyCalls).toEqual([]);
+        expect(calls(m, 'server.listen')).toEqual([]);
+        // IPC とウィンドウは通常どおり
+        expect(m.handledChannels()).toHaveLength(HANDLED_COUNT);
+        expect(m.fakes.windows).toHaveLength(1);
+      } else {
+        expect(m.fakes.fastifyCalls).toEqual([{ logger: false }]);
+        expect(calls(m, 'server.listen')).toEqual([[{ port: 3005, host: '127.0.0.1' }]]);
+      }
       executed++;
     });
 

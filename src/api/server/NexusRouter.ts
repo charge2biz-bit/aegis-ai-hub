@@ -9,6 +9,7 @@
  */
 
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { startSseHeartbeat } from './sse';
 
 /**
  * nexusRouter プラグイン
@@ -210,6 +211,8 @@ export const nexusRouter = async (fastify: FastifyInstance, options: FastifyPlug
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     });
+    // 最初のコメント行で接続の成立を知らせ、以後は heartbeat で無通信切断を防ぐ
+    startSseHeartbeat(reply.raw);
     orchestrator.subscribe(reply);
   });
 };

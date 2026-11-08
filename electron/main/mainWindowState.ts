@@ -6,8 +6,9 @@ import type { BrowserWindow } from 'electron';
  */
 let mainWindow: BrowserWindow | undefined;
 
+/** 破棄済みのウィンドウは返さない（macOS では閉じた後も参照が残り、触ると例外になる）。 */
 export function getMainWindow(): BrowserWindow | undefined {
-  return mainWindow;
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
 }
 
 export function setMainWindow(window: BrowserWindow): void {
@@ -16,8 +17,5 @@ export function setMainWindow(window: BrowserWindow): void {
 
 /** 破棄されていないメインウィンドウへ、レンダラー向けのイベントを送る。 */
 export function sendToRenderer(channel: string, payload: unknown): void {
-  const window = mainWindow;
-  if (window && !window.isDestroyed()) {
-    window.webContents.send(channel, payload);
-  }
+  getMainWindow()?.webContents.send(channel, payload);
 }

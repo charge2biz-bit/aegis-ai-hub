@@ -47,12 +47,6 @@ export function createMainWindow(services: Services, isDev: boolean, electronDir
   });
   setMainWindow(mainWindow);
 
-  // 古い連携口。NexusOrchestrator に定義されていれば webContents を渡す
-  const orchestrator = services.orchestrator as unknown as { setWebContents?: (contents: unknown) => void };
-  if (orchestrator && typeof orchestrator.setWebContents === 'function') {
-    orchestrator.setWebContents(mainWindow.webContents);
-  }
-
   // window.open() / <a target="_blank"> はシステムブラウザへ回し、子ウィンドウは作らない
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isWebUrl(url)) shell.openExternal(url);
